@@ -1,0 +1,16 @@
+services:
+  traefik:
+    command:
+      - --api.dashboard=true
+      - --providers.file.filename=/etc/traefik/dynamic.yml
+      - --entrypoints.web.address=:80
+      - --ping=true
+      - --metrics.prometheus=true
+    volumes:
+      - ../proxy/traefik/dynamic.prod.admin.yml:/etc/traefik/dynamic.yml:ro
+    secrets:
+      - traefik_admin_users
+
+secrets:
+  traefik_admin_users:
+    file: ../secrets/traefik_admin_users

@@ -24,6 +24,19 @@ http:
         - web
       service: grafana
 
+    traefik-admin:
+      rule: Host(`traefik-admin.localhost`)
+      entryPoints:
+        - web
+      middlewares:
+        - traefik-auth
+      service: api@internal
+
+  middlewares:
+    traefik-auth:
+      basicAuth:
+        usersFile: /run/secrets/traefik_admin_users
+
   services:
     web:
       loadBalancer:

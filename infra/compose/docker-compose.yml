@@ -2,8 +2,7 @@ services:
   traefik:
     image: traefik:v3.3
     command:
-      - --api.dashboard=true
-      - --api.insecure=true
+      - --api.dashboard=false
       - --providers.file.filename=/etc/traefik/dynamic.yml
       - --entrypoints.web.address=:80
       - --ping=true
