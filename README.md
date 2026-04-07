@@ -44,14 +44,27 @@ Servicios esperados:
 
 - App web: `http://web.localhost:${TRAEFIK_PORT}`
 - API: `http://api.localhost:${TRAEFIK_PORT}`
-- Prometheus: `http://prometheus.localhost:${TRAEFIK_PORT}`
-- Grafana: `http://grafana.localhost:${TRAEFIK_PORT}`
 
 Dashboard de Traefik:
 
 - no se expone en `make up`
 - se habilita de forma protegida con `make up-admin`
 - en produccion solo se habilita con `make up-prod-admin` usando `infra/secrets/traefik_admin_users`
+
+Observabilidad:
+
+- Prometheus, Grafana y `api.localhost/metrics` no se exponen en `make up`
+- se habilitan de forma protegida con `make up-admin`
+
+Produccion:
+
+- `make up-prod` habilita HTTPS en Traefik con Let's Encrypt
+- requiere `PUBLIC_BASE_DOMAIN` y `TRAEFIK_ACME_EMAIL` en `.env`
+
+Seguridad HTTP:
+
+- Next.js y Traefik agregan headers base de seguridad
+- en produccion Traefik agrega HSTS sobre HTTPS
 
 ## Objetivo de esta primera version
 

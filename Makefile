@@ -14,9 +14,12 @@ API_VENV := apps/api/.venv
 API_PYTHON := $(API_VENV)/bin/python
 TRAEFIK_ADMIN_USERS_FILE := infra/proxy/traefik/admin-users
 TRAEFIK_ADMIN_SECRET_FILE := infra/secrets/traefik_admin_users
-FORBIDDEN_SECRET_VALUES := admin change-me starter_password
+TRAEFIK_PROD_DYNAMIC_TEMPLATE := infra/proxy/traefik/dynamic.prod.tpl.yml
+TRAEFIK_PROD_DYNAMIC_FILE := infra/proxy/traefik/generated/dynamic.prod.yml
+TRAEFIK_PROD_ADMIN_DYNAMIC_TEMPLATE := infra/proxy/traefik/dynamic.prod.admin.tpl.yml
+TRAEFIK_PROD_ADMIN_DYNAMIC_FILE := infra/proxy/traefik/generated/dynamic.prod.admin.yml
 
-.PHONY: setup install install-api install-web up down logs ps build pull config validate-secrets-dev validate-secrets-prod traefik-admin-users check-prod-admin-secret up-admin down-admin logs-admin ps-admin config-admin up-prod-admin down-prod-admin logs-prod-admin ps-prod-admin config-prod-admin bootstrap deploy backup restore up-prod down-prod logs-prod ps-prod config-prod lint lint-fix test
+.PHONY: setup install install-api install-web up down logs ps build pull config validate-secrets-dev validate-secrets-prod validate-prod-tls render-traefik-prod render-traefik-prod-admin traefik-admin-users check-prod-admin-secret up-admin down-admin logs-admin ps-admin config-admin up-prod-admin down-prod-admin logs-prod-admin ps-prod-admin config-prod-admin bootstrap deploy backup restore up-prod down-prod logs-prod ps-prod config-prod lint lint-fix test
 
 setup:
 	cp -n .env.example .env || true
@@ -76,6 +79,21 @@ validate-secrets-dev:
 validate-secrets-prod:
 	@$(MAKE) validate-secrets-dev
 
+validate-prod-tls:
+	test -n "$(PUBLIC_BASE_DOMAIN)" || (echo "PUBLIC_BASE_DOMAIN is required in .env for production TLS" && exit 1)
+	test -n "$(TRAEFIK_ACME_EMAIL)" || (echo "TRAEFIK_ACME_EMAIL is required in .env for production TLS" && exit 1)
+	test "$(PUBLIC_BASE_DOMAIN)" != "localhost" || (echo "PUBLIC_BASE_DOMAIN must not be localhost for production TLS" && exit 1)
+
+render-traefik-prod:
+	$(MAKE) validate-prod-tls
+	mkdir -p infra/proxy/traefik/generated
+	envsubst '$${PUBLIC_BASE_DOMAIN}' < $(TRAEFIK_PROD_DYNAMIC_TEMPLATE) > $(TRAEFIK_PROD_DYNAMIC_FILE)
+
+render-traefik-prod-admin:
+	$(MAKE) validate-prod-tls
+	mkdir -p infra/proxy/traefik/generated
+	envsubst '$${PUBLIC_BASE_DOMAIN}' < $(TRAEFIK_PROD_ADMIN_DYNAMIC_TEMPLATE) > $(TRAEFIK_PROD_ADMIN_DYNAMIC_FILE)
+
 traefik-admin-users:
 	test -n "$(TRAEFIK_ADMIN_USER)" || (echo "TRAEFIK_ADMIN_USER is required in .env" && exit 1)
 	test -n "$(TRAEFIK_ADMIN_PASSWORD)" || (echo "TRAEFIK_ADMIN_PASSWORD is required in .env" && exit 1)
@@ -109,6 +127,7 @@ config-admin:
 
 up-prod:
 	$(MAKE) validate-secrets-prod
+	$(MAKE) render-traefik-prod
 	$(COMPOSE_PROD) up -d --build
 
 down-prod:
@@ -122,10 +141,12 @@ ps-prod:
 
 config-prod:
 	$(MAKE) validate-secrets-prod
+	$(MAKE) render-traefik-prod
 	$(COMPOSE_PROD) config
 
 up-prod-admin:
 	$(MAKE) validate-secrets-prod
+	$(MAKE) render-traefik-prod-admin
 	$(MAKE) check-prod-admin-secret
 	$(COMPOSE_PROD_ADMIN) up -d --build
 
@@ -140,6 +161,7 @@ ps-prod-admin:
 
 config-prod-admin:
 	$(MAKE) validate-secrets-prod
+	$(MAKE) render-traefik-prod-admin
 	$(MAKE) check-prod-admin-secret
 	$(COMPOSE_PROD_ADMIN) config
 
