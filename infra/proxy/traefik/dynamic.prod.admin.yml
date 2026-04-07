@@ -12,16 +12,32 @@ http:
         - web
       service: api
 
+    api-metrics:
+      rule: Host(`api.localhost`) && Path(`/metrics`)
+      entryPoints:
+        - web
+      priority: 100
+      middlewares:
+        - admin-allowlist
+        - traefik-auth
+      service: api
+
     prometheus:
       rule: Host(`prometheus.localhost`)
       entryPoints:
         - web
+      middlewares:
+        - admin-allowlist
+        - traefik-auth
       service: prometheus
 
     grafana:
       rule: Host(`grafana.localhost`)
       entryPoints:
         - web
+      middlewares:
+        - admin-allowlist
+        - traefik-auth
       service: grafana
 
     traefik-admin:
@@ -29,10 +45,18 @@ http:
       entryPoints:
         - web
       middlewares:
+        - admin-allowlist
         - traefik-auth
       service: api@internal
 
   middlewares:
+    admin-allowlist:
+      ipAllowList:
+        sourceRange:
+          - 127.0.0.1/32
+          - 10.0.0.0/8
+          - 172.16.0.0/12
+          - 192.168.0.0/16
     traefik-auth:
       basicAuth:
         usersFile: /run/secrets/traefik_admin_users

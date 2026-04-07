@@ -1,26 +1,32 @@
 http:
   routers:
     web:
-      rule: Host(`web.localhost`)
+      rule: Host(`web.${PUBLIC_BASE_DOMAIN}`)
       entryPoints:
-        - web
+        - websecure
       middlewares:
         - security-headers
+      tls:
+        certResolver: letsencrypt
       service: web
 
     api:
-      rule: Host(`api.localhost`)
+      rule: Host(`api.${PUBLIC_BASE_DOMAIN}`)
       entryPoints:
-        - web
+        - websecure
       middlewares:
         - security-headers
+      tls:
+        certResolver: letsencrypt
       service: api
 
     api-metrics-blocked:
-      rule: Host(`api.localhost`) && Path(`/metrics`)
+      rule: Host(`api.${PUBLIC_BASE_DOMAIN}`) && Path(`/metrics`)
       entryPoints:
-        - web
+        - websecure
       priority: 100
+      tls:
+        certResolver: letsencrypt
       service: noop@internal
 
   middlewares:
@@ -30,6 +36,8 @@ http:
         contentTypeNosniff: true
         referrerPolicy: strict-origin-when-cross-origin
         permissionsPolicy: camera=(), microphone=(), geolocation=()
+        stsSeconds: 31536000
+        stsIncludeSubdomains: true
         customResponseHeaders:
           Cross-Origin-Opener-Policy: same-origin
 

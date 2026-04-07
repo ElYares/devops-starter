@@ -1,60 +1,72 @@
 http:
   routers:
     web:
-      rule: Host(`web.localhost`)
+      rule: Host(`web.${PUBLIC_BASE_DOMAIN}`)
       entryPoints:
-        - web
+        - websecure
       middlewares:
         - security-headers
+      tls:
+        certResolver: letsencrypt
       service: web
 
     api:
-      rule: Host(`api.localhost`)
+      rule: Host(`api.${PUBLIC_BASE_DOMAIN}`)
       entryPoints:
-        - web
+        - websecure
       middlewares:
         - security-headers
+      tls:
+        certResolver: letsencrypt
       service: api
 
     api-metrics:
-      rule: Host(`api.localhost`) && Path(`/metrics`)
+      rule: Host(`api.${PUBLIC_BASE_DOMAIN}`) && Path(`/metrics`)
       entryPoints:
-        - web
+        - websecure
       priority: 100
       middlewares:
         - security-headers
         - admin-allowlist
         - traefik-auth
+      tls:
+        certResolver: letsencrypt
       service: api
 
     prometheus:
-      rule: Host(`prometheus.localhost`)
+      rule: Host(`prometheus.${PUBLIC_BASE_DOMAIN}`)
       entryPoints:
-        - web
+        - websecure
       middlewares:
         - security-headers
         - admin-allowlist
         - traefik-auth
+      tls:
+        certResolver: letsencrypt
       service: prometheus
 
     grafana:
-      rule: Host(`grafana.localhost`)
+      rule: Host(`grafana.${PUBLIC_BASE_DOMAIN}`)
       entryPoints:
-        - web
+        - websecure
       middlewares:
         - security-headers
         - admin-allowlist
         - traefik-auth
+      tls:
+        certResolver: letsencrypt
       service: grafana
 
     traefik-admin:
-      rule: Host(`traefik-admin.localhost`)
+      rule: Host(`traefik-admin.${PUBLIC_BASE_DOMAIN}`)
       entryPoints:
-        - web
+        - websecure
       middlewares:
         - security-headers
         - admin-allowlist
         - traefik-auth
+      tls:
+        certResolver: letsencrypt
       service: api@internal
 
   middlewares:
@@ -64,6 +76,8 @@ http:
         contentTypeNosniff: true
         referrerPolicy: strict-origin-when-cross-origin
         permissionsPolicy: camera=(), microphone=(), geolocation=()
+        stsSeconds: 31536000
+        stsIncludeSubdomains: true
         customResponseHeaders:
           Cross-Origin-Opener-Policy: same-origin
     admin-allowlist:
@@ -75,7 +89,7 @@ http:
           - 192.168.0.0/16
     traefik-auth:
       basicAuth:
-        usersFile: /etc/traefik/admin-users
+        usersFile: /run/secrets/traefik_admin_users
 
   services:
     web:
