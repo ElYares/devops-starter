@@ -7,7 +7,6 @@ from psycopg import connect
 from redis import Redis
 from starlette.responses import Response
 
-
 REQUEST_COUNTER = Counter("api_requests_total", "Total API requests")
 POSTGRES_UP = Gauge("api_postgres_up", "Postgres connectivity status")
 REDIS_UP = Gauge("api_redis_up", "Redis connectivity status")
@@ -64,6 +63,16 @@ async def lifespan(_: FastAPI):
 app = FastAPI(title="DevOps Starter API", lifespan=lifespan)
 
 
+def readiness_payload() -> dict[str, bool | str]:
+    postgres_ok = postgres_check()
+    redis_ok = redis_check()
+    return {
+        "status": "ready" if postgres_ok and redis_ok else "degraded",
+        "postgres": postgres_ok,
+        "redis": redis_ok,
+    }
+
+
 @app.get("/")
 def root():
     REQUEST_COUNTER.inc()
@@ -83,13 +92,7 @@ def health():
 @app.get("/ready")
 def ready():
     REQUEST_COUNTER.inc()
-    postgres_ok = postgres_check()
-    redis_ok = redis_check()
-    return {
-        "status": "ready" if postgres_ok and redis_ok else "degraded",
-        "postgres": postgres_ok,
-        "redis": redis_ok,
-    }
+    return readiness_payload()
 
 
 @app.get("/demo")
@@ -97,11 +100,12 @@ def demo():
     REQUEST_COUNTER.inc()
     cache = redis_client()
     visits = cache.incr("api_demo_visits")
+    status = readiness_payload()
     return {
         "service": "api",
         "visits": visits,
-        "postgres": postgres_check(),
-        "redis": redis_check(),
+        "postgres": status["postgres"],
+        "redis": status["redis"],
     }
 
 
