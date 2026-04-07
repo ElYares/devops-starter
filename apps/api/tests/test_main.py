@@ -1,6 +1,6 @@
 from fastapi.testclient import TestClient
 
-from app.main import app
+from app.main import app, redis_client
 
 client = TestClient(app)
 
@@ -24,3 +24,11 @@ def test_ready_endpoint_degraded_when_dependencies_fail(monkeypatch):
         "postgres": False,
         "redis": False,
     }
+
+
+def test_redis_client_uses_password_from_env(monkeypatch):
+    monkeypatch.setenv("REDIS_PASSWORD", "super-secret")
+
+    client = redis_client()
+
+    assert client.connection_pool.connection_kwargs["password"] == "super-secret"

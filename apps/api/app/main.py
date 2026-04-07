@@ -26,6 +26,7 @@ def redis_client() -> Redis:
     return Redis(
         host=os.getenv("REDIS_HOST", "redis"),
         port=int(os.getenv("REDIS_PORT", "6379")),
+        password=os.getenv("REDIS_PASSWORD"),
         decode_responses=True,
     )
 
