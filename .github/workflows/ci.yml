@@ -6,7 +6,7 @@ on:
   pull_request:
 
 jobs:
-  validate:
+  validate-compose:
     runs-on: ubuntu-latest
 
     steps:
@@ -16,5 +16,66 @@ jobs:
       - name: Copy env
         run: cp .env.example .env
 
-      - name: Validate Docker Compose
-        run: docker compose --env-file .env -f infra/compose/docker-compose.yml config
+      - name: Validate Docker Compose dev
+        run: docker compose --env-file .env -f infra/compose/docker-compose.yml -f infra/compose/docker-compose.dev.yml config
+
+      - name: Validate Docker Compose prod
+        run: docker compose --env-file .env -f infra/compose/docker-compose.yml -f infra/compose/docker-compose.prod.yml config
+
+  api-quality:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install API dependencies
+        run: pip install -r apps/api/requirements.txt
+
+      - name: Lint API
+        run: cd apps/api && python -m ruff check .
+
+      - name: Test API
+        run: cd apps/api && python -m pytest
+
+  web-quality:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+
+      - name: Install web dependencies
+        run: cd apps/web && npm install
+
+      - name: Lint web
+        run: cd apps/web && npm run lint
+
+      - name: Test web
+        run: cd apps/web && npm run test
+
+      - name: Build web
+        run: cd apps/web && npm run build
+
+  image-build:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Copy env
+        run: cp .env.example .env
+
+      - name: Build stack images
+        run: docker compose --env-file .env -f infra/compose/docker-compose.yml -f infra/compose/docker-compose.dev.yml build api web
