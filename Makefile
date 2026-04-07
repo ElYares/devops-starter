@@ -7,11 +7,15 @@ endif
 
 COMPOSE_BASE := docker compose --env-file .env -f infra/compose/docker-compose.yml
 COMPOSE_DEV := $(COMPOSE_BASE) -f infra/compose/docker-compose.dev.yml
+COMPOSE_ADMIN := $(COMPOSE_DEV) -f infra/compose/docker-compose.admin.yml
 COMPOSE_PROD := $(COMPOSE_BASE) -f infra/compose/docker-compose.prod.yml
+COMPOSE_PROD_ADMIN := $(COMPOSE_PROD) -f infra/compose/docker-compose.prod.admin.yml
 API_VENV := apps/api/.venv
 API_PYTHON := $(API_VENV)/bin/python
+TRAEFIK_ADMIN_USERS_FILE := infra/proxy/traefik/admin-users
+TRAEFIK_ADMIN_SECRET_FILE := infra/secrets/traefik_admin_users
 
-.PHONY: setup install install-api install-web up down logs ps build pull config bootstrap deploy backup restore up-prod down-prod logs-prod ps-prod config-prod lint lint-fix test
+.PHONY: setup install install-api install-web up down logs ps build pull config traefik-admin-users check-prod-admin-secret up-admin down-admin logs-admin ps-admin config-admin up-prod-admin down-prod-admin logs-prod-admin ps-prod-admin config-prod-admin bootstrap deploy backup restore up-prod down-prod logs-prod ps-prod config-prod lint lint-fix test
 
 setup:
 	cp -n .env.example .env || true
@@ -51,6 +55,32 @@ pull:
 config:
 	$(COMPOSE_DEV) config
 
+traefik-admin-users:
+	test -n "$(TRAEFIK_ADMIN_USER)" || (echo "TRAEFIK_ADMIN_USER is required in .env" && exit 1)
+	test -n "$(TRAEFIK_ADMIN_PASSWORD)" || (echo "TRAEFIK_ADMIN_PASSWORD is required in .env" && exit 1)
+	test "$(TRAEFIK_ADMIN_PASSWORD)" != "change-me-admin" || (echo "TRAEFIK_ADMIN_PASSWORD must be changed from the default value" && exit 1)
+	htpasswd -nbB "$(TRAEFIK_ADMIN_USER)" "$(TRAEFIK_ADMIN_PASSWORD)" > $(TRAEFIK_ADMIN_USERS_FILE)
+
+check-prod-admin-secret:
+	test -f "$(TRAEFIK_ADMIN_SECRET_FILE)" || (echo "$(TRAEFIK_ADMIN_SECRET_FILE) is required for prod admin access" && exit 1)
+
+up-admin:
+	$(MAKE) traefik-admin-users
+	$(COMPOSE_ADMIN) up -d --build
+
+down-admin:
+	$(COMPOSE_ADMIN) down
+
+logs-admin:
+	$(COMPOSE_ADMIN) logs -f
+
+ps-admin:
+	$(COMPOSE_ADMIN) ps
+
+config-admin:
+	$(MAKE) traefik-admin-users
+	$(COMPOSE_ADMIN) config
+
 up-prod:
 	$(COMPOSE_PROD) up -d --build
 
@@ -65,6 +95,23 @@ ps-prod:
 
 config-prod:
 	$(COMPOSE_PROD) config
+
+up-prod-admin:
+	$(MAKE) check-prod-admin-secret
+	$(COMPOSE_PROD_ADMIN) up -d --build
+
+down-prod-admin:
+	$(COMPOSE_PROD_ADMIN) down
+
+logs-prod-admin:
+	$(COMPOSE_PROD_ADMIN) logs -f
+
+ps-prod-admin:
+	$(COMPOSE_PROD_ADMIN) ps
+
+config-prod-admin:
+	$(MAKE) check-prod-admin-secret
+	$(COMPOSE_PROD_ADMIN) config
 
 lint:
 	test -x $(API_PYTHON) || (echo "API virtualenv missing. Run 'make install-api' first." && exit 1)

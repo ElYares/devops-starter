@@ -42,11 +42,16 @@ make up
 
 Servicios esperados:
 
-- App web: `http://web.localhost`
-- API: `http://api.localhost`
-- Traefik dashboard: `http://traefik.localhost`
-- Prometheus: `http://prometheus.localhost`
-- Grafana: `http://grafana.localhost`
+- App web: `http://web.localhost:${TRAEFIK_PORT}`
+- API: `http://api.localhost:${TRAEFIK_PORT}`
+- Prometheus: `http://prometheus.localhost:${TRAEFIK_PORT}`
+- Grafana: `http://grafana.localhost:${TRAEFIK_PORT}`
+
+Dashboard de Traefik:
+
+- no se expone en `make up`
+- se habilita de forma protegida con `make up-admin`
+- en produccion solo se habilita con `make up-prod-admin` usando `infra/secrets/traefik_admin_users`
 
 ## Objetivo de esta primera version
 
