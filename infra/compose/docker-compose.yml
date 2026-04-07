@@ -8,9 +8,6 @@ services:
       - --entrypoints.web.address=:80
       - --ping=true
       - --metrics.prometheus=true
-    ports:
-      - "${TRAEFIK_PORT:-80}:80"
-      - "8080:8080"
     volumes:
       - ../proxy/traefik/dynamic.yml:/etc/traefik/dynamic.yml:ro
     healthcheck:
@@ -58,7 +55,7 @@ services:
       api:
         condition: service_healthy
     healthcheck:
-      test: ["CMD", "wget", "-qO-", "http://127.0.0.1:3000"]
+      test: ["CMD", "wget", "-qO-", "http://127.0.0.1:3000/api/health"]
       interval: 15s
       timeout: 5s
       retries: 5

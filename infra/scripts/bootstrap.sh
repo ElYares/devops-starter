@@ -15,4 +15,6 @@ else
   echo ".env already exists"
 fi
 
-echo "Bootstrap complete. Run 'make up' to start the stack."
+echo "Bootstrap complete."
+echo "Run 'make install' to install local quality-tool dependencies."
+echo "Run 'make up' to start the stack."
