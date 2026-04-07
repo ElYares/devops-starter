@@ -14,8 +14,9 @@ API_VENV := apps/api/.venv
 API_PYTHON := $(API_VENV)/bin/python
 TRAEFIK_ADMIN_USERS_FILE := infra/proxy/traefik/admin-users
 TRAEFIK_ADMIN_SECRET_FILE := infra/secrets/traefik_admin_users
+FORBIDDEN_SECRET_VALUES := admin change-me starter_password
 
-.PHONY: setup install install-api install-web up down logs ps build pull config traefik-admin-users check-prod-admin-secret up-admin down-admin logs-admin ps-admin config-admin up-prod-admin down-prod-admin logs-prod-admin ps-prod-admin config-prod-admin bootstrap deploy backup restore up-prod down-prod logs-prod ps-prod config-prod lint lint-fix test
+.PHONY: setup install install-api install-web up down logs ps build pull config validate-secrets-dev validate-secrets-prod traefik-admin-users check-prod-admin-secret up-admin down-admin logs-admin ps-admin config-admin up-prod-admin down-prod-admin logs-prod-admin ps-prod-admin config-prod-admin bootstrap deploy backup restore up-prod down-prod logs-prod ps-prod config-prod lint lint-fix test
 
 setup:
 	cp -n .env.example .env || true
@@ -35,6 +36,7 @@ bootstrap:
 	./infra/scripts/bootstrap.sh
 
 up:
+	$(MAKE) validate-secrets-dev
 	$(COMPOSE_DEV) up -d --build
 
 down:
@@ -53,11 +55,33 @@ pull:
 	$(COMPOSE_DEV) pull
 
 config:
+	$(MAKE) validate-secrets-dev
 	$(COMPOSE_DEV) config
+
+validate-secrets-dev:
+	@for var in POSTGRES_PASSWORD REDIS_PASSWORD GRAFANA_ADMIN_PASSWORD; do \
+		value="$${!var:-}"; \
+		if [ -z "$$value" ]; then \
+			echo "$$var is required in .env"; \
+			exit 1; \
+		fi; \
+		case "$$value" in \
+			admin|change-me|starter_password) \
+				echo "$$var must not use the insecure default value '$$value'"; \
+				exit 1; \
+				;; \
+		esac; \
+	done
+
+validate-secrets-prod:
+	@$(MAKE) validate-secrets-dev
 
 traefik-admin-users:
 	test -n "$(TRAEFIK_ADMIN_USER)" || (echo "TRAEFIK_ADMIN_USER is required in .env" && exit 1)
 	test -n "$(TRAEFIK_ADMIN_PASSWORD)" || (echo "TRAEFIK_ADMIN_PASSWORD is required in .env" && exit 1)
+	test "$(TRAEFIK_ADMIN_PASSWORD)" != "admin" || (echo "TRAEFIK_ADMIN_PASSWORD must not use the insecure default value 'admin'" && exit 1)
+	test "$(TRAEFIK_ADMIN_PASSWORD)" != "change-me" || (echo "TRAEFIK_ADMIN_PASSWORD must not use the insecure default value 'change-me'" && exit 1)
+	test "$(TRAEFIK_ADMIN_PASSWORD)" != "starter_password" || (echo "TRAEFIK_ADMIN_PASSWORD must not use the insecure default value 'starter_password'" && exit 1)
 	test "$(TRAEFIK_ADMIN_PASSWORD)" != "change-me-admin" || (echo "TRAEFIK_ADMIN_PASSWORD must be changed from the default value" && exit 1)
 	htpasswd -nbB "$(TRAEFIK_ADMIN_USER)" "$(TRAEFIK_ADMIN_PASSWORD)" > $(TRAEFIK_ADMIN_USERS_FILE)
 
@@ -65,6 +89,7 @@ check-prod-admin-secret:
 	test -f "$(TRAEFIK_ADMIN_SECRET_FILE)" || (echo "$(TRAEFIK_ADMIN_SECRET_FILE) is required for prod admin access" && exit 1)
 
 up-admin:
+	$(MAKE) validate-secrets-dev
 	$(MAKE) traefik-admin-users
 	$(COMPOSE_ADMIN) up -d --build
 
@@ -78,10 +103,12 @@ ps-admin:
 	$(COMPOSE_ADMIN) ps
 
 config-admin:
+	$(MAKE) validate-secrets-dev
 	$(MAKE) traefik-admin-users
 	$(COMPOSE_ADMIN) config
 
 up-prod:
+	$(MAKE) validate-secrets-prod
 	$(COMPOSE_PROD) up -d --build
 
 down-prod:
@@ -94,9 +121,11 @@ ps-prod:
 	$(COMPOSE_PROD) ps
 
 config-prod:
+	$(MAKE) validate-secrets-prod
 	$(COMPOSE_PROD) config
 
 up-prod-admin:
+	$(MAKE) validate-secrets-prod
 	$(MAKE) check-prod-admin-secret
 	$(COMPOSE_PROD_ADMIN) up -d --build
 
@@ -110,6 +139,7 @@ ps-prod-admin:
 	$(COMPOSE_PROD_ADMIN) ps
 
 config-prod-admin:
+	$(MAKE) validate-secrets-prod
 	$(MAKE) check-prod-admin-secret
 	$(COMPOSE_PROD_ADMIN) config
 
