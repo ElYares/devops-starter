@@ -35,7 +35,8 @@ devops-starter/
 ## Quickstart
 
 ```bash
-cp .env.example .env
+make setup
+make install
 make up
 ```
 
@@ -56,6 +57,33 @@ Servicios esperados:
 - monitoreo base
 - pipeline CI inicial
 - documentacion inicial
+
+## Modos de compose
+
+- `infra/compose/docker-compose.yml`: base comun del stack
+- `infra/compose/docker-compose.dev.yml`: overlay para desarrollo local
+- `infra/compose/docker-compose.prod.yml`: overlay para entorno server
+
+Comandos principales:
+
+```bash
+make install
+make install-api
+make install-web
+make up
+make down
+make config
+make up-prod
+make config-prod
+make lint
+make test
+```
+
+`make install` prepara las dependencias locales para lint y tests:
+
+- crea `apps/api/.venv`
+- instala dependencias Python de la API
+- instala dependencias Node del frontend
 
 ## Siguientes pasos
 
