@@ -99,6 +99,11 @@ make test
 
 Antes de levantar el stack, cambia los secretos de `.env`. Los comandos de arranque fallan si detectan valores inseguros como `admin`, `change-me` o `starter_password`.
 
+Backups:
+
+- `make backup` genera backups cifrados de PostgreSQL
+- `make restore` restaura un backup cifrado
+
 `make install` prepara las dependencias locales para lint y tests:
 
 - crea `apps/api/.venv`

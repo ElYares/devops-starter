@@ -190,4 +190,5 @@ backup:
 
 restore:
 	chmod +x infra/scripts/*.sh
-	./infra/scripts/restore.sh
+	test -n "$(BACKUP_FILE)" || (echo "BACKUP_FILE is required. Use 'make restore BACKUP_FILE=path/to/file.sql.gz.enc'" && exit 1)
+	./infra/scripts/restore.sh "$(BACKUP_FILE)"
