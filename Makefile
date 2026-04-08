@@ -1,10 +1,5 @@
 SHELL := /bin/bash
 
-ifneq (,$(wildcard .env))
-include .env
-export
-endif
-
 COMPOSE_BASE := docker compose --env-file .env -f infra/compose/docker-compose.yml
 COMPOSE_DEV := $(COMPOSE_BASE) -f infra/compose/docker-compose.dev.yml
 COMPOSE_ADMIN := $(COMPOSE_DEV) -f infra/compose/docker-compose.admin.yml
@@ -62,7 +57,8 @@ config:
 	$(COMPOSE_DEV) config
 
 validate-secrets-dev:
-	@for var in POSTGRES_PASSWORD REDIS_PASSWORD GRAFANA_ADMIN_PASSWORD; do \
+	@bash -lc 'set -a; source .env; set +a; \
+	for var in POSTGRES_PASSWORD REDIS_PASSWORD GRAFANA_ADMIN_PASSWORD; do \
 		value="$${!var:-}"; \
 		if [ -z "$$value" ]; then \
 			echo "$$var is required in .env"; \
@@ -70,38 +66,40 @@ validate-secrets-dev:
 		fi; \
 		case "$$value" in \
 			admin|change-me|starter_password) \
-				echo "$$var must not use the insecure default value '$$value'"; \
+				echo "$$var must not use the insecure default value '\''$$value'\''"; \
 				exit 1; \
 				;; \
 		esac; \
-	done
+	done'
 
 validate-secrets-prod:
 	@$(MAKE) validate-secrets-dev
 
 validate-prod-tls:
-	test -n "$(PUBLIC_BASE_DOMAIN)" || (echo "PUBLIC_BASE_DOMAIN is required in .env for production TLS" && exit 1)
-	test -n "$(TRAEFIK_ACME_EMAIL)" || (echo "TRAEFIK_ACME_EMAIL is required in .env for production TLS" && exit 1)
-	test "$(PUBLIC_BASE_DOMAIN)" != "localhost" || (echo "PUBLIC_BASE_DOMAIN must not be localhost for production TLS" && exit 1)
+	@bash -lc 'set -a; source .env; set +a; \
+	test -n "$${PUBLIC_BASE_DOMAIN:-}" || (echo "PUBLIC_BASE_DOMAIN is required in .env for production TLS" && exit 1); \
+	test -n "$${TRAEFIK_ACME_EMAIL:-}" || (echo "TRAEFIK_ACME_EMAIL is required in .env for production TLS" && exit 1); \
+	test "$${PUBLIC_BASE_DOMAIN}" != "localhost" || (echo "PUBLIC_BASE_DOMAIN must not be localhost for production TLS" && exit 1)'
 
 render-traefik-prod:
 	$(MAKE) validate-prod-tls
 	mkdir -p infra/proxy/traefik/generated
-	envsubst '$${PUBLIC_BASE_DOMAIN}' < $(TRAEFIK_PROD_DYNAMIC_TEMPLATE) > $(TRAEFIK_PROD_DYNAMIC_FILE)
+	@bash -lc 'set -a; source .env; set +a; envsubst '\''$${PUBLIC_BASE_DOMAIN}'\'' < $(TRAEFIK_PROD_DYNAMIC_TEMPLATE) > $(TRAEFIK_PROD_DYNAMIC_FILE)'
 
 render-traefik-prod-admin:
 	$(MAKE) validate-prod-tls
 	mkdir -p infra/proxy/traefik/generated
-	envsubst '$${PUBLIC_BASE_DOMAIN}' < $(TRAEFIK_PROD_ADMIN_DYNAMIC_TEMPLATE) > $(TRAEFIK_PROD_ADMIN_DYNAMIC_FILE)
+	@bash -lc 'set -a; source .env; set +a; envsubst '\''$${PUBLIC_BASE_DOMAIN}'\'' < $(TRAEFIK_PROD_ADMIN_DYNAMIC_TEMPLATE) > $(TRAEFIK_PROD_ADMIN_DYNAMIC_FILE)'
 
 traefik-admin-users:
-	test -n "$(TRAEFIK_ADMIN_USER)" || (echo "TRAEFIK_ADMIN_USER is required in .env" && exit 1)
-	test -n "$(TRAEFIK_ADMIN_PASSWORD)" || (echo "TRAEFIK_ADMIN_PASSWORD is required in .env" && exit 1)
-	test "$(TRAEFIK_ADMIN_PASSWORD)" != "admin" || (echo "TRAEFIK_ADMIN_PASSWORD must not use the insecure default value 'admin'" && exit 1)
-	test "$(TRAEFIK_ADMIN_PASSWORD)" != "change-me" || (echo "TRAEFIK_ADMIN_PASSWORD must not use the insecure default value 'change-me'" && exit 1)
-	test "$(TRAEFIK_ADMIN_PASSWORD)" != "starter_password" || (echo "TRAEFIK_ADMIN_PASSWORD must not use the insecure default value 'starter_password'" && exit 1)
-	test "$(TRAEFIK_ADMIN_PASSWORD)" != "change-me-admin" || (echo "TRAEFIK_ADMIN_PASSWORD must be changed from the default value" && exit 1)
-	htpasswd -nbB "$(TRAEFIK_ADMIN_USER)" "$(TRAEFIK_ADMIN_PASSWORD)" > $(TRAEFIK_ADMIN_USERS_FILE)
+	@bash -lc 'set -a; source .env; set +a; \
+	test -n "$${TRAEFIK_ADMIN_USER:-}" || (echo "TRAEFIK_ADMIN_USER is required in .env" && exit 1); \
+	test -n "$${TRAEFIK_ADMIN_PASSWORD:-}" || (echo "TRAEFIK_ADMIN_PASSWORD is required in .env" && exit 1); \
+	test "$${TRAEFIK_ADMIN_PASSWORD}" != "admin" || (echo "TRAEFIK_ADMIN_PASSWORD must not use the insecure default value '\''admin'\''" && exit 1); \
+	test "$${TRAEFIK_ADMIN_PASSWORD}" != "change-me" || (echo "TRAEFIK_ADMIN_PASSWORD must not use the insecure default value '\''change-me'\''" && exit 1); \
+	test "$${TRAEFIK_ADMIN_PASSWORD}" != "starter_password" || (echo "TRAEFIK_ADMIN_PASSWORD must not use the insecure default value '\''starter_password'\''" && exit 1); \
+	test "$${TRAEFIK_ADMIN_PASSWORD}" != "change-me-admin" || (echo "TRAEFIK_ADMIN_PASSWORD must be changed from the default value" && exit 1); \
+	htpasswd -nbB "$${TRAEFIK_ADMIN_USER}" "$${TRAEFIK_ADMIN_PASSWORD}" > $(TRAEFIK_ADMIN_USERS_FILE)'
 
 check-prod-admin-secret:
 	test -f "$(TRAEFIK_ADMIN_SECRET_FILE)" || (echo "$(TRAEFIK_ADMIN_SECRET_FILE) is required for prod admin access" && exit 1)
