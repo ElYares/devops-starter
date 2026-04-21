@@ -4,10 +4,14 @@ services:
       - "${TRAEFIK_PORT:-80}:80"
 
   api:
+    build:
+      context: ../../apps/api
     environment:
       APP_ENV: development
 
   web:
+    build:
+      context: ../../apps/web
     environment:
       NODE_ENV: production
 
