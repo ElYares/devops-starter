@@ -126,7 +126,8 @@ config-admin:
 up-prod:
 	$(MAKE) validate-secrets-prod
 	$(MAKE) render-traefik-prod
-	$(COMPOSE_PROD) up -d --build
+	$(COMPOSE_PROD) pull api web
+	$(COMPOSE_PROD) up -d
 
 down-prod:
 	$(COMPOSE_PROD) down
@@ -146,7 +147,8 @@ up-prod-admin:
 	$(MAKE) validate-secrets-prod
 	$(MAKE) render-traefik-prod-admin
 	$(MAKE) check-prod-admin-secret
-	$(COMPOSE_PROD_ADMIN) up -d --build
+	$(COMPOSE_PROD_ADMIN) pull api web
+	$(COMPOSE_PROD_ADMIN) up -d
 
 down-prod-admin:
 	$(COMPOSE_PROD_ADMIN) down

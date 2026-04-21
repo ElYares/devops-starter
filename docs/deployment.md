@@ -18,6 +18,10 @@
 - `make config-prod`: valida configuracion prod
 - `make config-prod-admin`: valida produccion con dashboard protegido por secret
 
+Guia relacionada:
+
+- [docs/raspberry-pi-testing.md](/home/elyarestark/develop/devops-starter/docs/raspberry-pi-testing.md): staging de pruebas en Raspberry Pi con GHCR y GitHub Actions
+
 ## Seguridad antes de exponer el stack
 
 Antes de usar `make up-prod` fuera de un entorno local, revisa [docs/security.md](/home/elyarestark/develop/devops-starter/docs/security.md).
@@ -40,6 +44,9 @@ Variables requeridas en `.env`:
 
 - `PUBLIC_BASE_DOMAIN`
 - `TRAEFIK_ACME_EMAIL`
+- `API_IMAGE`
+- `WEB_IMAGE`
+- `IMAGE_TAG`
 - `TRAEFIK_PORT`
 - `TRAEFIK_TLS_PORT`
 
@@ -48,6 +55,9 @@ Ejemplo:
 ```bash
 PUBLIC_BASE_DOMAIN=example.com
 TRAEFIK_ACME_EMAIL=ops@example.com
+API_IMAGE=ghcr.io/acme/devops-starter/api
+WEB_IMAGE=ghcr.io/acme/devops-starter/web
+IMAGE_TAG=sha-abcdef123456
 TRAEFIK_PORT=80
 TRAEFIK_TLS_PORT=443
 ```
@@ -126,6 +136,5 @@ Variables relevantes en `.env`:
 
 ## Proximo objetivo
 
-- parametrizar imagenes para registry
-- anadir script de deploy controlado
+- conectar el workflow de CD con los secrets y environments de GitHub Actions
 - definir estrategia de release por ramas o tags
