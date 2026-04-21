@@ -36,8 +36,7 @@ services:
 
   # API service used by the frontend, healthchecks and Prometheus.
   api:
-    build:
-      context: ../../apps/api
+    image: ${API_IMAGE:-devops-starter-api}:${IMAGE_TAG:-local}
     environment:
       POSTGRES_DB: ${POSTGRES_DB:-starter}
       POSTGRES_USER: ${POSTGRES_USER:-starter}
@@ -74,8 +73,7 @@ services:
 
   # Next.js server. It prefers the internal API URL while running inside Compose.
   web:
-    build:
-      context: ../../apps/web
+    image: ${WEB_IMAGE:-devops-starter-web}:${IMAGE_TAG:-local}
     environment:
       API_INTERNAL_BASE_URL: http://api:8000
       NEXT_PUBLIC_API_BASE_URL: ${NEXT_PUBLIC_API_BASE_URL:-http://api.localhost}

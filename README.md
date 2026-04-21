@@ -37,6 +37,7 @@ Documentacion por capa:
 - `infra/README.md`: orquestacion, redes, overlays y scripts operativos
 - `apps/api/README.md`: contrato de la API, probes y metricas
 - `apps/web/README.md`: flujo del frontend, variables de entorno y healthcheck
+- `docs/raspberry-pi-testing.md`: entorno de pruebas ARM64 en Raspberry Pi para validar CD
 
 ## Quickstart
 
