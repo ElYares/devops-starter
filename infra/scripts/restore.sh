@@ -1,5 +1,7 @@
 #!/usr/bin/env bash
 
+# Restores an encrypted PostgreSQL backup into the running Compose database.
+# The script assumes the operator already selected the target backup file.
 set -euo pipefail
 
 umask 077
@@ -32,6 +34,7 @@ if [[ ! -f "${backup_file}" ]]; then
   exit 1
 fi
 
+# Decryption and restore are streamed to avoid leaving plaintext dumps on disk.
 echo "Restoring PostgreSQL backup from ${backup_file}"
 openssl enc -d -aes-256-cbc -pbkdf2 -pass env:BACKUP_ENCRYPTION_PASSPHRASE -in "${backup_file}" \
   | gunzip -c \

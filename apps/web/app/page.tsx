@@ -1,4 +1,14 @@
-async function getApiStatus() {
+type ApiStatus = {
+  service: string;
+  visits: number | null;
+  postgres: boolean;
+  redis: boolean;
+  error?: string;
+};
+
+// This page renders on the server. Prefer the internal Docker network before
+// the public URL so the frontend can talk to the API without leaving Compose.
+async function getApiStatus(): Promise<ApiStatus> {
   const baseUrl =
     process.env.API_INTERNAL_BASE_URL ||
     process.env.NEXT_PUBLIC_API_BASE_URL ||
@@ -15,6 +25,7 @@ async function getApiStatus() {
 
     return response.json();
   } catch {
+    // Keep the homepage renderable even while the API is still booting.
     return {
       service: "api",
       visits: null,
@@ -50,6 +61,7 @@ export default async function Home() {
         </article>
 
         <article className="card accent">
+          {/* Esta tarjeta hace visible el contrato minimo entre web y API. */}
           <h2>Respuesta de la API</h2>
           <pre>{JSON.stringify(api, null, 2)}</pre>
         </article>

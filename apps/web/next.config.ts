@@ -1,5 +1,7 @@
 import type { NextConfig } from "next";
 
+// Base headers are applied at the framework layer so they survive regardless of
+// whether traffic reaches the app directly or through Traefik.
 const securityHeaders = [
   {
     key: "X-Frame-Options",
@@ -26,6 +28,7 @@ const securityHeaders = [
 const nextConfig: NextConfig = {
   output: "standalone",
   async headers() {
+    // Apply the same baseline to every route, including the health handler.
     return [
       {
         source: "/:path*",

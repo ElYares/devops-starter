@@ -1,5 +1,7 @@
 #!/usr/bin/env bash
 
+# Prepares the local environment file and blocks obviously insecure defaults
+# before the user tries to boot the stack.
 set -euo pipefail
 
 if [[ ! -f .env ]]; then
@@ -19,6 +21,8 @@ required_secrets=(
   "GRAFANA_ADMIN_PASSWORD"
 )
 
+# Fail fast on empty or placeholder credentials because the starter is meant to
+# model safe defaults from day one.
 for key in "${required_secrets[@]}"; do
   value="${!key:-}"
   if [[ -z "${value}" ]]; then
