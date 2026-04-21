@@ -32,6 +32,12 @@ devops-starter/
 └── README.md
 ```
 
+Documentacion por capa:
+
+- `infra/README.md`: orquestacion, redes, overlays y scripts operativos
+- `apps/api/README.md`: contrato de la API, probes y metricas
+- `apps/web/README.md`: flujo del frontend, variables de entorno y healthcheck
+
 ## Quickstart
 
 ```bash

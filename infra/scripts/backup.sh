@@ -1,5 +1,8 @@
 #!/usr/bin/env bash
 
+# Creates an encrypted logical PostgreSQL backup from the running Compose stack.
+# Output files are written with restrictive permissions because they contain
+# application data even after compression.
 set -euo pipefail
 
 umask 077
@@ -23,6 +26,7 @@ fi
 backup_dir="${BACKUP_DIR:-infra/backups}"
 retention_days="${BACKUP_RETENTION_DAYS:-7}"
 
+# Keep backups inside infra by default so operational artifacts stay discoverable.
 mkdir -p "${backup_dir}"
 timestamp="$(date +%Y%m%d-%H%M%S)"
 target="${backup_dir}/postgres-${timestamp}.sql.gz.enc"
@@ -33,6 +37,7 @@ docker compose --env-file .env -f infra/compose/docker-compose.yml exec -T postg
   | gzip -c \
   | openssl enc -aes-256-cbc -pbkdf2 -salt -pass env:BACKUP_ENCRYPTION_PASSPHRASE -out "${target}"
 
+# Retention is simple on purpose: delete encrypted snapshots older than N days.
 find "${backup_dir}" -type f -name 'postgres-*.sql.gz.enc' -mtime +"${retention_days}" -delete
 
 echo "Backup completed"
