@@ -13,14 +13,10 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Copy env
-        run: cp .env.example .env
-
-      - name: Validate Docker Compose dev
-        run: docker compose --env-file .env -f infra/compose/docker-compose.yml -f infra/compose/docker-compose.dev.yml config
-
-      - name: Validate Docker Compose prod
-        run: docker compose --env-file .env -f infra/compose/docker-compose.yml -f infra/compose/docker-compose.prod.yml config
+      # The workflow intentionally shells through Make so local quality checks
+      # and CI keep the same contract over time.
+      - name: Validate Docker Compose
+        run: make ci-compose
 
   api-quality:
     runs-on: ubuntu-latest
@@ -34,14 +30,8 @@ jobs:
         with:
           python-version: "3.12"
 
-      - name: Install API dependencies
-        run: pip install -r apps/api/requirements.txt
-
-      - name: Lint API
-        run: cd apps/api && python -m ruff check .
-
-      - name: Test API
-        run: cd apps/api && python -m pytest
+      - name: Run API quality gates
+        run: make ci-api
 
   web-quality:
     runs-on: ubuntu-latest
@@ -54,18 +44,11 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: "22"
+          cache: "npm"
+          cache-dependency-path: apps/web/package-lock.json
 
-      - name: Install web dependencies
-        run: cd apps/web && npm install
-
-      - name: Lint web
-        run: cd apps/web && npm run lint
-
-      - name: Test web
-        run: cd apps/web && npm run test
-
-      - name: Build web
-        run: cd apps/web && npm run build
+      - name: Run web quality gates
+        run: make ci-web
 
   image-build:
     runs-on: ubuntu-latest

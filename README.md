@@ -95,6 +95,9 @@ Comandos principales:
 make install
 make install-api
 make install-web
+make ci-compose
+make ci-api
+make ci-web
 make up
 make down
 make config
@@ -116,6 +119,12 @@ Backups:
 - crea `apps/api/.venv`
 - instala dependencias Python de la API
 - instala dependencias Node del frontend
+
+Contrato de calidad:
+
+- `make ci-compose`: valida overlays dev y prod con `.env.example`
+- `make ci-api`: instala dependencias de API, corre lint y tests
+- `make ci-web`: instala dependencias web con lockfile, corre lint, tests y build
 
 ## Siguientes pasos
 

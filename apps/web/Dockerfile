@@ -2,7 +2,9 @@ FROM node:22-alpine AS deps
 
 WORKDIR /app
 COPY package.json package.json
-RUN npm install
+COPY package-lock.json package-lock.json
+# Build images must follow the lockfile exactly to keep CI and runtime aligned.
+RUN npm ci
 
 FROM node:22-alpine AS builder
 

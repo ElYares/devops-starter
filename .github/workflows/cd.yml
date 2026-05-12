@@ -1,8 +1,10 @@
 name: cd
 
 on:
+  workflow_run:
+    workflows: ["ci"]
+    types: [completed]
   push:
-    branches: ["main"]
     tags:
       - "v*"
   workflow_dispatch:
@@ -20,9 +22,10 @@ on:
 permissions:
   contents: read
   packages: write
+  security-events: write
 
 concurrency:
-  group: cd-${{ github.ref }}
+  group: cd-${{ github.event.workflow_run.head_branch || github.ref }}
   cancel-in-progress: true
 
 env:
@@ -31,9 +34,16 @@ env:
 jobs:
   prepare:
     runs-on: ubuntu-latest
+    if: |
+      (github.event_name == 'workflow_run' &&
+        github.event.workflow_run.conclusion == 'success' &&
+        github.event.workflow_run.head_branch == 'main') ||
+      github.event_name == 'workflow_dispatch' ||
+      startsWith(github.ref, 'refs/tags/v')
     outputs:
       repository_lower: ${{ steps.meta.outputs.repository_lower }}
       deploy_ref: ${{ steps.meta.outputs.deploy_ref }}
+      checkout_ref: ${{ steps.meta.outputs.checkout_ref }}
 
     steps:
       - name: Derive image names
@@ -42,10 +52,16 @@ jobs:
         run: |
           echo "repository_lower=${GITHUB_REPOSITORY,,}" >> "$GITHUB_OUTPUT"
 
-          if [[ "${GITHUB_REF_TYPE}" == "tag" ]]; then
+          if [[ "${GITHUB_EVENT_NAME}" == "workflow_run" ]]; then
+            workflow_sha="${{ github.event.workflow_run.head_sha }}"
+            echo "deploy_ref=sha-${workflow_sha::12}" >> "$GITHUB_OUTPUT"
+            echo "checkout_ref=${{ github.event.workflow_run.head_sha }}" >> "$GITHUB_OUTPUT"
+          elif [[ "${GITHUB_REF_TYPE}" == "tag" ]]; then
             echo "deploy_ref=${GITHUB_REF_NAME}" >> "$GITHUB_OUTPUT"
+            echo "checkout_ref=${GITHUB_REF}" >> "$GITHUB_OUTPUT"
           else
             echo "deploy_ref=sha-${GITHUB_SHA::12}" >> "$GITHUB_OUTPUT"
+            echo "checkout_ref=${GITHUB_SHA}" >> "$GITHUB_OUTPUT"
           fi
 
   publish-api:
@@ -53,10 +69,14 @@ jobs:
     runs-on: ubuntu-latest
     outputs:
       image: ${{ steps.image.outputs.name }}
+      digest: ${{ steps.build.outputs.digest }}
+      image_ref: ${{ steps.ref.outputs.value }}
 
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+        with:
+          ref: ${{ needs.prepare.outputs.checkout_ref }}
 
       - name: Set API image name
         id: image
@@ -84,6 +104,7 @@ jobs:
             type=raw,value=latest,enable={{is_default_branch}}
 
       - name: Build and push API image
+        id: build
         uses: docker/build-push-action@v6
         with:
           context: ./apps/api
@@ -93,15 +114,23 @@ jobs:
           tags: ${{ steps.docker_meta.outputs.tags }}
           labels: ${{ steps.docker_meta.outputs.labels }}
 
+      - name: Export API image digest ref
+        id: ref
+        run: echo "value=${{ steps.image.outputs.name }}@${{ steps.build.outputs.digest }}" >> "$GITHUB_OUTPUT"
+
   publish-web:
     needs: prepare
     runs-on: ubuntu-latest
     outputs:
       image: ${{ steps.image.outputs.name }}
+      digest: ${{ steps.build.outputs.digest }}
+      image_ref: ${{ steps.ref.outputs.value }}
 
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+        with:
+          ref: ${{ needs.prepare.outputs.checkout_ref }}
 
       - name: Set web image name
         id: image
@@ -129,6 +158,7 @@ jobs:
             type=raw,value=latest,enable={{is_default_branch}}
 
       - name: Build and push web image
+        id: build
         uses: docker/build-push-action@v6
         with:
           context: ./apps/web
@@ -138,18 +168,62 @@ jobs:
           tags: ${{ steps.docker_meta.outputs.tags }}
           labels: ${{ steps.docker_meta.outputs.labels }}
 
+      - name: Export web image digest ref
+        id: ref
+        run: echo "value=${{ steps.image.outputs.name }}@${{ steps.build.outputs.digest }}" >> "$GITHUB_OUTPUT"
+
+  scan-api-image:
+    needs: publish-api
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Scan API image with Trivy
+        uses: aquasecurity/trivy-action@0.28.0
+        with:
+          image-ref: ${{ needs.publish-api.outputs.image_ref }}
+          format: sarif
+          output: trivy-api.sarif
+          severity: HIGH,CRITICAL
+          exit-code: "1"
+
+      - name: Upload API SARIF
+        uses: github/codeql-action/upload-sarif@v3
+        with:
+          sarif_file: trivy-api.sarif
+
+  scan-web-image:
+    needs: publish-web
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Scan web image with Trivy
+        uses: aquasecurity/trivy-action@0.28.0
+        with:
+          image-ref: ${{ needs.publish-web.outputs.image_ref }}
+          format: sarif
+          output: trivy-web.sarif
+          severity: HIGH,CRITICAL
+          exit-code: "1"
+
+      - name: Upload web SARIF
+        uses: github/codeql-action/upload-sarif@v3
+        with:
+          sarif_file: trivy-web.sarif
+
   deploy-staging:
-    needs: [prepare, publish-api, publish-web]
+    needs: [prepare, publish-api, publish-web, scan-api-image, scan-web-image]
     runs-on: ubuntu-latest
     environment: staging
     if: |
-      (github.ref == 'refs/heads/main' || inputs.deploy_environment == 'staging') &&
+      ((github.event_name == 'workflow_run' && github.event.workflow_run.head_branch == 'main') ||
+        inputs.deploy_environment == 'staging') &&
       vars.CD_STAGING_ENABLED == 'true'
     env:
       DEPLOY_HOST: ${{ secrets.DEPLOY_HOST }}
       DEPLOY_USER: ${{ secrets.DEPLOY_USER }}
       DEPLOY_PATH: ${{ secrets.DEPLOY_PATH }}
       DEPLOY_SSH_KEY: ${{ secrets.DEPLOY_SSH_KEY }}
+      DEPLOY_KNOWN_HOSTS: ${{ secrets.DEPLOY_KNOWN_HOSTS }}
 
     steps:
       - name: Check deploy prerequisites
@@ -168,7 +242,13 @@ jobs:
           install -m 700 -d ~/.ssh
           printf '%s\n' "$DEPLOY_SSH_KEY" > ~/.ssh/id_ed25519
           chmod 600 ~/.ssh/id_ed25519
-          ssh-keyscan -H "$DEPLOY_HOST" >> ~/.ssh/known_hosts
+
+          if [[ -n "$DEPLOY_KNOWN_HOSTS" ]]; then
+            printf '%s\n' "$DEPLOY_KNOWN_HOSTS" > ~/.ssh/known_hosts
+          else
+            echo "DEPLOY_KNOWN_HOSTS not configured; falling back to ssh-keyscan."
+            ssh-keyscan -H "$DEPLOY_HOST" >> ~/.ssh/known_hosts
+          fi
 
       - name: Trigger remote staging deploy
         shell: bash
@@ -176,11 +256,12 @@ jobs:
           ssh "$DEPLOY_USER@$DEPLOY_HOST" \
             "cd '$DEPLOY_PATH' && \
             export DEPLOY_ENV=staging && \
-            export IMAGE_TAG='${{ needs.prepare.outputs.deploy_ref }}' && \
+            export API_IMAGE_REF='${{ needs.publish-api.outputs.image_ref }}' && \
+            export WEB_IMAGE_REF='${{ needs.publish-web.outputs.image_ref }}' && \
             ./infra/scripts/deploy.sh"
 
   deploy-production:
-    needs: [prepare, publish-api, publish-web]
+    needs: [prepare, publish-api, publish-web, scan-api-image, scan-web-image]
     runs-on: ubuntu-latest
     environment: production
     if: |
@@ -191,6 +272,7 @@ jobs:
       DEPLOY_USER: ${{ secrets.DEPLOY_USER }}
       DEPLOY_PATH: ${{ secrets.DEPLOY_PATH }}
       DEPLOY_SSH_KEY: ${{ secrets.DEPLOY_SSH_KEY }}
+      DEPLOY_KNOWN_HOSTS: ${{ secrets.DEPLOY_KNOWN_HOSTS }}
 
     steps:
       - name: Check deploy prerequisites
@@ -209,7 +291,13 @@ jobs:
           install -m 700 -d ~/.ssh
           printf '%s\n' "$DEPLOY_SSH_KEY" > ~/.ssh/id_ed25519
           chmod 600 ~/.ssh/id_ed25519
-          ssh-keyscan -H "$DEPLOY_HOST" >> ~/.ssh/known_hosts
+
+          if [[ -n "$DEPLOY_KNOWN_HOSTS" ]]; then
+            printf '%s\n' "$DEPLOY_KNOWN_HOSTS" > ~/.ssh/known_hosts
+          else
+            echo "DEPLOY_KNOWN_HOSTS not configured; falling back to ssh-keyscan."
+            ssh-keyscan -H "$DEPLOY_HOST" >> ~/.ssh/known_hosts
+          fi
 
       - name: Trigger remote production deploy
         shell: bash
@@ -217,5 +305,6 @@ jobs:
           ssh "$DEPLOY_USER@$DEPLOY_HOST" \
             "cd '$DEPLOY_PATH' && \
             export DEPLOY_ENV=production && \
-            export IMAGE_TAG='${{ needs.prepare.outputs.deploy_ref }}' && \
+            export API_IMAGE_REF='${{ needs.publish-api.outputs.image_ref }}' && \
+            export WEB_IMAGE_REF='${{ needs.publish-web.outputs.image_ref }}' && \
             ./infra/scripts/deploy.sh"

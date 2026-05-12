@@ -99,6 +99,7 @@ TRAEFIK_TLS_PORT=443
 Notas:
 
 - `IMAGE_TAG` sera sobrescrito por `cd.yml` durante el deploy remoto.
+- `API_IMAGE_REF` y `WEB_IMAGE_REF` pueden ser inyectados por `cd.yml` para fijar digests exactos.
 - `PUBLIC_BASE_DOMAIN` debe ser un dominio real resolviendo hacia la Raspberry Pi.
 - Usa valores unicos para staging; no reutilices secretos de produccion.
 
@@ -159,6 +160,7 @@ Secrets:
 - `DEPLOY_USER`: usuario SSH
 - `DEPLOY_PATH`: ruta del repo en la Raspberry Pi
 - `DEPLOY_SSH_KEY`: llave privada usada por Actions
+- `DEPLOY_KNOWN_HOSTS`: huella SSH del host para evitar `ssh-keyscan` en runtime
 
 Variables:
 
@@ -167,10 +169,11 @@ Variables:
 El workflow [`.github/workflows/cd.yml`](/home/elyarestark/develop/devops-starter/.github/workflows/cd.yml:1)
 hara esto:
 
-1. construira y publicara imagenes `api` y `web` en GHCR
-2. generara un `IMAGE_TAG` basado en commit o tag
-3. entrara por SSH a la Raspberry Pi
-4. ejecutara `./infra/scripts/deploy.sh`
+1. esperara a que `ci` termine en verde para staging
+2. construira y publicara imagenes `api` y `web` en GHCR
+3. escaneara las imagenes publicadas
+4. entrara por SSH a la Raspberry Pi
+5. ejecutara `./infra/scripts/deploy.sh` con digests inmutables
 
 ## DNS recomendado para pruebas
 

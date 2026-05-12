@@ -1,0 +1,16 @@
+version: 1
+
+compose:
+  files:
+    - infra/compose/docker-compose.yml
+    - infra/compose/docker-compose.dev.yml
+  env_file: .env
+
+proxy:
+  domain: web.localhost
+  service: traefik
+  port: 80
+
+notes:
+  - "Canonical local stack is base compose plus the development overlay."
+  - "The stack exposes multiple local routes through Traefik, including web.localhost and api.localhost."

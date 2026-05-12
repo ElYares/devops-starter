@@ -47,6 +47,8 @@ Variables requeridas en `.env`:
 - `API_IMAGE`
 - `WEB_IMAGE`
 - `IMAGE_TAG`
+- `API_IMAGE_REF` opcional para deploys por digest
+- `WEB_IMAGE_REF` opcional para deploys por digest
 - `TRAEFIK_PORT`
 - `TRAEFIK_TLS_PORT`
 
@@ -82,6 +84,8 @@ Notas:
 - Traefik agrega headers de seguridad en el borde y HSTS en produccion
 - FastAPI deshabilita `/docs`, `/redoc` y `/openapi.json` cuando `APP_ENV=production`
 - el compose base aplica hardening de contenedores con `read_only`, `no-new-privileges`, `tmpfs` y limites por servicio cuando es viable
+- CD puede sobreescribir `API_IMAGE_REF` y `WEB_IMAGE_REF` para desplegar digests inmutables
+- `infra/scripts/deploy.sh` ahora intenta rollback automatico si los smoke checks fallan
 
 ## Acceso local
 
@@ -138,3 +142,30 @@ Variables relevantes en `.env`:
 
 - conectar el workflow de CD con los secrets y environments de GitHub Actions
 - definir estrategia de release por ramas o tags
+
+## Contrato base de CI
+
+El repo define tres comandos canonicos para calidad continua:
+
+- `make ci-compose`
+- `make ci-api`
+- `make ci-web`
+
+La idea es que GitHub Actions y las validaciones locales usen exactamente esos
+targets para reducir drift entre YAML y repo.
+
+## Contrato base de CD
+
+El workflow de CD ahora sigue estas reglas:
+
+- staging se dispara desde `workflow_run` despues de `ci` exitoso en `main`
+- produccion sigue pudiendo promoverse por tag `v*` o `workflow_dispatch`
+- las imagenes se despliegan por digest usando `API_IMAGE_REF` y `WEB_IMAGE_REF`
+- antes de publicar trafico estable, `deploy.sh` corre smoke checks y hace rollback basico si fallan
+
+Secret recomendado adicional para el runner de deploy:
+
+- `DEPLOY_KNOWN_HOSTS`
+
+Si no existe, el workflow cae a `ssh-keyscan`, pero la opcion recomendada es
+pinnear la huella del host desde un secret.

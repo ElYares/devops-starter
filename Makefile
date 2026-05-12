@@ -14,7 +14,7 @@ TRAEFIK_PROD_DYNAMIC_FILE := infra/proxy/traefik/generated/dynamic.prod.yml
 TRAEFIK_PROD_ADMIN_DYNAMIC_TEMPLATE := infra/proxy/traefik/dynamic.prod.admin.tpl.yml
 TRAEFIK_PROD_ADMIN_DYNAMIC_FILE := infra/proxy/traefik/generated/dynamic.prod.admin.yml
 
-.PHONY: setup install install-api install-web up down logs ps build pull config validate-secrets-dev validate-secrets-prod validate-prod-tls render-traefik-prod render-traefik-prod-admin traefik-admin-users check-prod-admin-secret up-admin down-admin logs-admin ps-admin config-admin up-prod-admin down-prod-admin logs-prod-admin ps-prod-admin config-prod-admin bootstrap deploy backup restore up-prod down-prod logs-prod ps-prod config-prod lint lint-fix test
+.PHONY: setup install install-api install-web up down logs ps build pull config validate-secrets-dev validate-secrets-prod validate-prod-tls render-traefik-prod render-traefik-prod-admin traefik-admin-users check-prod-admin-secret up-admin down-admin logs-admin ps-admin config-admin up-prod-admin down-prod-admin logs-prod-admin ps-prod-admin config-prod-admin bootstrap deploy backup restore up-prod down-prod logs-prod ps-prod config-prod lint lint-fix test ci-api ci-web ci-compose
 
 setup:
 	cp -n .env.example .env || true
@@ -27,7 +27,7 @@ install-api:
 	$(API_PYTHON) -m pip install -r apps/api/requirements.txt
 
 install-web:
-	cd apps/web && npm install
+	cd apps/web && npm ci
 
 bootstrap:
 	chmod +x infra/scripts/*.sh
@@ -179,6 +179,30 @@ test:
 	test -x $(API_PYTHON) || (echo "API virtualenv missing. Run 'make install-api' first." && exit 1)
 	$(API_PYTHON) -m pytest apps/api
 	cd apps/web && npm run test
+
+# Canonical CI target for the API. The workflow should call this target instead
+# of duplicating install/lint/test logic in YAML.
+ci-api:
+	python3 -m venv $(API_VENV)
+	$(API_PYTHON) -m pip install -r apps/api/requirements.txt
+	$(API_PYTHON) -m ruff check apps/api
+	$(API_PYTHON) -m pytest apps/api
+
+# Canonical CI target for the web app. Use the lockfile to keep dependency
+# resolution deterministic across local runs, CI and image builds.
+ci-web:
+	cd apps/web && npm ci
+	rm -rf apps/web/.next
+	cd apps/web && npm run lint
+	cd apps/web && npm run test
+	cd apps/web && npm run build
+
+# Canonical CI target for compose validation. CI copies the example env so both
+# overlays are rendered through the same path that operators use locally.
+ci-compose:
+	cp .env.example .env
+	$(COMPOSE_DEV) config
+	$(COMPOSE_PROD) config
 
 deploy:
 	chmod +x infra/scripts/*.sh
